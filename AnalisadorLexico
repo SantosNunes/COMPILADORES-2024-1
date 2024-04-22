@@ -1,0 +1,91 @@
+import Token as t
+import Automato as at
+import TabelaDeSimbolos as ts
+
+class AnalisadorLexico:
+  def __init__(self, codigoFonte):
+    self.numLinha = 0
+    self.numColuna = 0
+    self.codigoFonte = codigoFonte
+    self.tamanhoDoCodigo = len(codigoFonte)
+    self.tamanhoDaLinha = len(codigoFonte[self.numLinha])
+    self.tabelaDeSimbolos = ts.TabelaDeSimbolos()
+    self.listaDeTextos = []
+    
+  def SCANNER(self):
+    lexema = ""
+    automato = at.Automato()
+    erroCharInvalido = False
+    while(self.numLinha < self.tamanhoDoCodigo):
+      self.tamanhoDaLinha = len(self.codigoFonte[self.numLinha])
+      while(self.numColuna < self.tamanhoDaLinha - 1):
+        char = self.codigoFonte[self.numLinha][self.numColuna]
+ 
+        if char == '$':
+          return t.Token('EOF','EOF','EOF', self.numLinha)
+        
+        elif(char in automato.alfabeto):
+          estado = self.classificarChar(char, automato)
+          if (automato.verificarSeProximoEstadoEValido(estado)):
+            lexema = lexema + char
+            self.numColuna += 1      
+          else:
+            if(automato.verificarSeEstadoAtualEValido()):
+              token = self.preencheToken(automato, t, lexema, self.numLinha)
+              lexema = ""
+              if(token.classe == "Comentário"):
+                automato = at.Automato()
+              else:  
+                return token
+            else:
+              automato.lancarErro(self.numLinha+1)
+              erroCharInvalido = True
+              lexema = ""
+              self.numColuna +=1        
+        else:
+          print('ERRO LÉXICO – Caracter inválido, linha', self.numLinha+1)
+          self.numColuna += 1
+          erroCharInvalido = True
+          automato.estadoAtual = 0
+          lexema = ""
+                    
+      self.numLinha += 1
+      self.numColuna = 0
+      
+      if(automato.verificarSeEstadoAtualEValido()):
+        token = self.preencheToken(automato, t, lexema, self.numLinha)
+        lexema = ""
+        if(token.classe == "Comentário"):
+          automato = at.Automato()
+        else:  
+          return token
+      
+      else:
+        if not(erroCharInvalido):
+          automato.lancarErro(self.numLinha)
+          lexema = ""
+          erroCharInvalido=False
+  
+  def preencheToken(self, automato, t, lexema, linha):
+    classe = automato.getClasseDoEstadoFinal()
+    tipo = "NULL"
+    lexema = lexema.strip()
+    if(classe == 'NUM'):
+      if automato.estadoAtual == 3 or automato.estadoAtual == 11 : tipo = 'Real'
+      else: tipo = 'Inteiro'
+    elif(classe == 'Lit'): tipo = 'Literal'
+    token = t.Token(classe,lexema,tipo,linha)  
+    if classe == 'id':
+      token = self.tabelaDeSimbolos.busca(token)
+    return token                                
+
+  def classificarChar(self, char, automato):
+    if char in automato.digitos:
+      estado = 'D'     
+    elif char in automato.letras:
+      estado = 'L'
+      if char == 'e'or char == 'E':
+        estado = 'E'
+    else:
+      estado = char
+    return estado
